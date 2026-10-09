@@ -85,8 +85,8 @@ Notes:
 
 ### Sweeping it up
 
-- Anyone with a key to the house (the owner, and anyone with entry permission) sees a **Sweep up** target on each
-  piece of junk.
+- Everyone inside the house can see the junk and its **Sweep up** target, but the server only lets the owner and
+  anyone with entry permission sweep it. Anyone else is turned away.
 - Sweeping plays a broom animation and a progress bar (`Junk.CleanMs`, default 3 seconds).
 - When it finishes, the piece is removed and the player gets one `trash_bag`.
 - The bag is **tagged with the house it came from**.
@@ -108,6 +108,7 @@ Notes:
 
 With `KeepContents = true` nothing empties the bin on its own. Another resource has to do that, see
 [Building on the bin exports](#7-building-on-the-bin-exports).
+
 ### Bags only count for their own house
 
 Each `trash_bag` is created with the property ID attached, and the inventory shows "Junk from <house name>".
@@ -279,3 +280,11 @@ All of these happen on the server, so a modified client cannot get around them:
 | The bin never gets emptied | Nothing empties it on its own. With `Bin.KeepContents = true`, use `EmptyBin` from your own job or script (see [Building on the bin exports](#7-building-on-the-bin-exports)). |
 | The bin never fills or shows a pile of bags | `Bin.KeepContents` is `false` (the default), so dumped bags are thrown away. |
 | Changes to settings do nothing | Restart the resource. |
+
+### Known limitations
+
+- **Who is inside** is reported by the housing script when a player walks into or out of a property. If a player
+  is moved out some other way (respawning after death, an admin teleport), they still count as inside until they
+  enter another property or disconnect. Junk keeps building in a house while it counts someone as inside.
+- Junk and bin state are saved in batches every 30 seconds and when the resource stops, so a server crash can lose
+  the last few seconds of changes.

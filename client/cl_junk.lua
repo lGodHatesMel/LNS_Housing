@@ -3,6 +3,7 @@ local Settings = lib.load('shared.settings')
 -- Junk pieces inside the property the player is in. The server sends the piece ids and a seed; each piece's spot is
 -- worked out here from the seed and its id on a ring around the interior entry point, so every visit looks the same.
 
+local insideId = nil    -- property the player is in, from the enter / exit events (InsidePropertyId is not set for every MLO visitor)
 local current = nil     -- { propertyId, ids, seed }
 local anchor = nil      -- vec3 on the floor where the player entered
 local pieces = {}       -- [junkId] = { entity, zone }
@@ -130,7 +131,7 @@ local function CreatePiece(junkId)
 
     local model = joaat(modelName)
     if not IsModelInCdimage(model) or not pcall(lib.requestModel, model, 3000) then return end
-    if not current or InsidePropertyId ~= current.propertyId then return end
+    if not current or insideId ~= current.propertyId then return end
 
     local entity = CreateObjectNoOffset(model, spot.x, spot.y, spot.z, false, false, false)
     SetModelAsNoLongerNeeded(model)
@@ -161,7 +162,7 @@ end
 ---Makes the spawned pieces match the server's list. Only pieces that are missing or gone get touched.
 local function Rebuild()
     if not IsEnabled() or not current or not anchor then return end
-    if InsidePropertyId ~= current.propertyId then return end
+    if insideId ~= current.propertyId then return end
 
     -- An update that arrives while pieces are still being created is picked up by another pass
     if building then
@@ -182,7 +183,7 @@ local function Rebuild()
         end
 
         for _, junkId in ipairs(ids) do
-            if not current or InsidePropertyId ~= current.propertyId then break end
+            if not current or insideId ~= current.propertyId then break end
             if not pieces[junkId] then
                 CreatePiece(junkId)
                 Wait(0)
@@ -200,7 +201,7 @@ end
 
 RegisterNetEvent('LNS_Housing:client:junkChanged', function(propertyId, ids, seed)
     if not IsEnabled() or type(ids) ~= 'table' or type(seed) ~= 'number' then return end
-    if InsidePropertyId ~= propertyId then return end
+    if insideId ~= propertyId then return end
 
     -- A different property than before means the old pieces are gone with it
     if current and current.propertyId ~= propertyId then Reset() end
@@ -211,11 +212,12 @@ end)
 
 AddEventHandler('LNS_Housing:client:enteredProperty', function(propertyId)
     if not IsEnabled() or not propertyId then return end
+    insideId = propertyId
 
     CreateThread(function()
         -- Give the interior a moment to stream in; the entry point is the floor under the player
         Wait(1500)
-        if InsidePropertyId ~= propertyId then return end
+        if insideId ~= propertyId then return end
 
         local ped = GetEntityCoords(cache.ped)
         anchor = vec3(ped.x, ped.y, ped.z - 0.95)
@@ -223,11 +225,17 @@ AddEventHandler('LNS_Housing:client:enteredProperty', function(propertyId)
     end)
 end)
 
-AddEventHandler('LNS_Housing:client:exitedProperty', function()
+AddEventHandler('LNS_Housing:client:exitedProperty', function(propertyId)
+    -- An exit for a property we already left (walking from one zone straight into another) must not wipe the new one
+    if propertyId and insideId and propertyId ~= insideId then return end
+    insideId = nil
     Reset()
 end)
 
-AddEventHandler('qbx_core:client:onPlayerUnload', Reset)
+AddEventHandler('qbx_core:client:onPlayerUnload', function()
+    insideId = nil
+    Reset()
+end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then DestroyAll() end

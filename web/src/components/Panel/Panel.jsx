@@ -292,7 +292,11 @@ const Panel = ({ data: initialData }) => {
   });
 
   const handlePlaceBin = () => postToGame('startOwnerBinPlacement', { propertyId: propertyData.id });
-  const handleRemoveBin = () => postToGame('removeOwnerBin', { propertyId: propertyData.id });
+  const handleRemoveBin = () => {
+    postToGame('removeOwnerBin', { propertyId: propertyData.id });
+    // The server's update only drops the field, and the tablet merges updates over its old data, so clear it here too
+    setPropertyData(prev => ({ ...prev, metadata: { ...(prev?.metadata || {}), bin_coords: null } }));
+  };
 
   const handleViewCamera = () => {
     fetch(`https://${window.GetParentResourceName ? window.GetParentResourceName() : 'LNS_Housing'}/viewDoorbellCamera`, {
