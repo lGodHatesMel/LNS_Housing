@@ -22,7 +22,8 @@ if Settings.RealEstate and Settings.RealEstate.Command then
                 hasPermission = hasPermission,
                 onlyBuyViaContracts = Settings.RealEstate.OnlyBuyViaContracts,
                 shells = shellList,
-                electricityEnabled = (Settings.Electricity == nil or Settings.Electricity.Enabled ~= false)
+                electricityEnabled = (Settings.Electricity == nil or Settings.Electricity.Enabled ~= false),
+                cleaningEnabled = Settings.Cleaning ~= nil and Settings.Cleaning.Enabled == true
             }
         })
         SetNuiFocus(true, true)
@@ -50,7 +51,8 @@ RegisterNetEvent('LNS_Housing:client:openRealEstateFromItem', function()
             hasPermission = hasPermission,
             onlyBuyViaContracts = Settings.RealEstate.OnlyBuyViaContracts,
             shells = shellList,
-            electricityEnabled = (Settings.Electricity == nil or Settings.Electricity.Enabled ~= false)
+            electricityEnabled = (Settings.Electricity == nil or Settings.Electricity.Enabled ~= false),
+            cleaningEnabled = Settings.Cleaning ~= nil and Settings.Cleaning.Enabled == true
         }
     })
     SetNuiFocus(true, true)

@@ -286,6 +286,14 @@ const Panel = ({ data: initialData }) => {
     });
   };
 
+  const postToGame = (name, body) => fetch(`https://${window.GetParentResourceName ? window.GetParentResourceName() : 'LNS_Housing'}/${name}`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
+  const handlePlaceBin = () => postToGame('startOwnerBinPlacement', { propertyId: propertyData.id });
+  const handleRemoveBin = () => postToGame('removeOwnerBin', { propertyId: propertyData.id });
+
   const handleViewCamera = () => {
     fetch(`https://${window.GetParentResourceName ? window.GetParentResourceName() : 'LNS_Housing'}/viewDoorbellCamera`, {
       method: 'POST',
@@ -1182,7 +1190,40 @@ const Panel = ({ data: initialData }) => {
                     </div>
                   </div>
 
+                  {propertyData.features?.bin && (
+                    <div className="settings-section">
+                      <div className="section-header-row">
+                        <Trash2 size={16} />
+                        <h3>Garbage Bin</h3>
+                      </div>
 
+                      <div className="settings-list">
+                        <div className="setting-item">
+                          <div className="setting-info">
+                            <MapPin size={14} />
+                            <div>
+                              <h4>{propertyData.metadata?.bin_coords ? 'Bin placed' : 'No bin placed'}</h4>
+                              <p>The bin has to stand outside your property. Sweep up junk inside, then dump the trash bags in your bin.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                        <button className="camera-view-btn" type="button" onClick={handlePlaceBin}>
+                          <MapPin size={12} /> {propertyData.metadata?.bin_coords ? 'Move Bin' : 'Place Bin'}
+                        </button>
+                        {propertyData.metadata?.bin_coords && (
+                          <button className="camera-view-btn" type="button" onClick={handleRemoveBin}>
+                            <Trash2 size={12} /> Remove Bin
+                          </button>
+                        )}
+                      </div>
+                      <p className="tab-subtitle" style={{ marginTop: '10px' }}>
+                        This closes the tablet. Walk outside, aim at flat ground near your property, then press E to place the bin.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="settings-right-col">

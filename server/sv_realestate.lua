@@ -371,6 +371,15 @@ lib.callback.register('LNS_Housing:server:updateListingDetails', function(source
         p.metadata.breaker_coords = data.breakerCoords
     end
 
+    if IsCleaningEnabled() then
+        local bin = ValidateBin(data.binCoords, p.zone_data, p.metadata.shell)
+        if bin and IsBinNearProperty(p, bin) then
+            p.metadata.bin_coords = bin
+        elseif data.binCoords == nil then
+            p.metadata.bin_coords = nil
+        end
+    end
+
     if data.entranceType == 'coords' then
         p.metadata.entrance = data.entranceCoords
         if p.metadata.locked == nil then

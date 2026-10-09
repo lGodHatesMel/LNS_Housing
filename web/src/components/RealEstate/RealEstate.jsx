@@ -11,7 +11,7 @@ import {
     EyeOff
 } from 'lucide-react';
 
-const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts, shells, onOpenPaperContract, electricityEnabled = true }) => {
+const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts, shells, onOpenPaperContract, electricityEnabled = true, cleaningEnabled = false }) => {
     const handleOpenPaperContract = (contract) => {
         if (onOpenPaperContract) {
             onOpenPaperContract(contract);
@@ -170,6 +170,7 @@ const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts
         garageCoords: null,
         garageSpawnCoords: null,
         breakerCoords: null,
+        binCoords: null,
         cameraPosition: null,
         cameraAim: null,
         cameraHeading: null,
@@ -382,6 +383,7 @@ const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts
             garageCoords: p.metadata && p.metadata.garage_data ? { x: p.metadata.garage_data.x, y: p.metadata.garage_data.y, z: p.metadata.garage_data.z, h: p.metadata.garage_data.h } : null,
             garageSpawnCoords: p.metadata && p.metadata.garage_data && p.metadata.garage_data.spawn ? p.metadata.garage_data.spawn : null,
             breakerCoords: p.metadata && p.metadata.breaker_coords ? p.metadata.breaker_coords : (p.breakerCoords || null),
+            binCoords: p.metadata && p.metadata.bin_coords ? p.metadata.bin_coords : null,
             cameraPosition: p.metadata && p.metadata.camera_coords ? p.metadata.camera_coords : null,
             cameraAim: p.metadata && p.metadata.camera_aim ? p.metadata.camera_aim : null,
             cameraHeading: p.metadata && p.metadata.camera_heading != null ? p.metadata.camera_heading : null,
@@ -420,6 +422,7 @@ const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts
                 garageCoords: parseInt(formData.slots, 10) > 0 ? formData.garageCoords : null,
                 garageSpawnCoords: parseInt(formData.slots, 10) > 0 ? formData.garageSpawnCoords : null,
                 breakerCoords: formData.breakerCoords,
+                binCoords: formData.binCoords,
                 cameraPosition: formData.cameraPosition,
                 cameraAim: formData.cameraAim,
                 cameraHeading: formData.cameraHeading,
@@ -683,6 +686,19 @@ const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts
             });
     };
 
+    const handlePickBinCoords = () => {
+        fetch(`https://${window.GetParentResourceName ? window.GetParentResourceName() : 'LNS_Housing'}/pickBinCoords`, {
+            method: 'POST',
+            body: JSON.stringify({})
+        })
+            .then(resp => resp.json())
+            .then(coords => {
+                if (coords) {
+                    setFormData(prev => ({ ...prev, binCoords: coords }));
+                }
+            });
+    };
+
     const handlePickGarageCoords = () => {
         fetch(`https://${window.GetParentResourceName ? window.GetParentResourceName() : 'LNS_Housing'}/pickGarageCoords`, {
             method: 'POST',
@@ -747,6 +763,7 @@ const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts
             garageCoords: null,
             garageSpawnCoords: null,
             breakerCoords: null,
+            binCoords: null,
             cameraPosition: null,
             cameraAim: null,
             cameraHeading: null,
@@ -1655,6 +1672,20 @@ const RealEstate = ({ properties, hasPermission, initialTab, onlyBuyViaContracts
                                                 </div>
                                                 <button className="re-btn-action" type="button" onClick={handlePickBreakerCoords}>
                                                     {formData.breakerCoords ? 'Reselect Breaker' : 'Set Current Position'}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {cleaningEnabled && (
+                                            <div className="re-interactive-row">
+                                                <div className="re-interactive-info">
+                                                    <span className="re-interactive-label">Garbage Bin Location</span>
+                                                    <span className={`re-interactive-status ${formData.binCoords ? 'active' : ''}`}>
+                                                        {formData.binCoords ? 'Bin Placed' : 'Not Placed'}
+                                                    </span>
+                                                </div>
+                                                <button className="re-btn-action" type="button" onClick={handlePickBinCoords}>
+                                                    {formData.binCoords ? 'Move Bin' : 'Place Bin'}
                                                 </button>
                                             </div>
                                         )}

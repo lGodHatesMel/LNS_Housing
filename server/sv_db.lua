@@ -127,6 +127,7 @@ function CreateProperty(data)
             camera_heading = data.camera_heading or 0.0,
             doorbell_camera = data.doorbell_camera or false,
             breaker_coords = data.breaker_coords or data.breakerCoords or nil,
+            bin_coords = ValidateBin(data.binCoords or data.bin_coords, data.zone_data, data.mlo and 'mlo' or data.shell),
             max_power = (Settings.Electricity and Settings.Electricity.DefaultMaxPower) or 5.0,
             power_level = 1,
             breaker_tripped = false
@@ -172,6 +173,7 @@ function CreateProperty(data)
                 camera_heading = data.camera_heading or 0.0,
                 doorbell_camera = data.doorbell_camera or false,
                 breaker_coords = data.breaker_coords or data.breakerCoords or nil,
+                bin_coords = ValidateBin(data.binCoords or data.bin_coords, data.zone_data, data.mlo and 'mlo' or data.shell),
                 max_power = (Settings.Electricity and Settings.Electricity.DefaultMaxPower) or 5.0,
                 power_level = 1,
                 breaker_tripped = false

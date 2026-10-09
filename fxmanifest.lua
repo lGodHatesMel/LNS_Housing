@@ -12,6 +12,7 @@ files {
     'web/dist/index.html',
     'web/dist/**/*',
     'stream/[Shells]/*.ytyp',
+    'stream/[Props]/[Junk]/*.ytyp',
     'sound/data/lns_sounds.dat54.rel',
     'sound/audiodirectory/lns_bank.awc',
     'data/weapons.meta',
@@ -46,7 +47,10 @@ client_scripts {
     'client/cl_apartments.lua',
     'client/cl_locksmith.lua',
     'client/cl_screenshot.lua',
-    'client/cl_electricity.lua'
+    'client/cl_electricity.lua',
+    'client/cl_occupancy.lua',
+    'client/cl_cleaning.lua',
+    'client/cl_junk.lua'
 }
 
 server_scripts {
@@ -66,7 +70,11 @@ server_scripts {
     'server/sv_locksmith.lua',
     'server/sv_screenshot.lua',
     'server/sv_screenshot.js',
-    'server/sv_electricity.lua'
+    'server/sv_electricity.lua',
+    'server/sv_occupancy.lua',
+    'server/sv_cleaning.lua',
+    'server/sv_junk.lua',
+    'server/sv_bins.lua'
 }
 
 dependencies {
@@ -76,6 +84,7 @@ dependencies {
 }
 
 data_file 'DLC_ITYP_REQUEST' 'stream/[Shells]/starter_shells_k4mb1.ytyp'
+data_file 'DLC_ITYP_REQUEST' 'stream/[Props]/[Junk]/ghm_junk.ytyp'
 data_file 'AUDIO_WAVEPACK'  'sound/audiodirectory'
 data_file 'AUDIO_SOUNDDATA' 'sound/data/lns_sounds.dat'
 data_file 'WEAPONINFO_FILE' 'data/weapons.meta'
@@ -90,5 +99,6 @@ escrow_ignore {
     'stream/[Shells]/*.ymf',
     'stream/[Shells]/*.ytyp',
     'stream/[Shells]/*.ymap',
-    'stream/[Shells]/*.ymap',
+    'stream/[Props]/[Junk]/*.ydr',
+    'stream/[Props]/[Junk]/*.ytyp',
 }

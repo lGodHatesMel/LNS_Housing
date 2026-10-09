@@ -846,6 +846,7 @@ local function EnterWalkInProperty(propertyId)
     currentWalkInProperty = propertyId
     InsidePropertyId = propertyId
     TriggerServerEvent('LNS_Housing:server:enterPropertyBucket', propertyId)
+    TriggerEvent('LNS_Housing:client:enteredProperty', propertyId)
     LoadFurnitures(propertyId)
     if CheckPropertyTemperatureNotify then CheckPropertyTemperatureNotify(propertyId) end
 
@@ -875,6 +876,7 @@ local function LeaveWalkInProperty()
     lib.removeRadialItem('housing_furniture')
     UnloadFurnitures(oldPropId)
     TriggerServerEvent('LNS_Housing:server:leavePropertyBucket')
+    TriggerEvent('LNS_Housing:client:exitedProperty', oldPropId)
 end
 
 CreateThread(function()
@@ -925,6 +927,7 @@ function RegisterPropertyZones(p, forceShell)
             thickness = thickness,
             debug = Settings.Debug.Zones,
             onEnter = function()
+                TriggerEvent('LNS_Housing:client:enteredProperty', p.id)
                 LoadFurnitures(p.id)
                 if CheckPropertyTemperatureNotify then CheckPropertyTemperatureNotify(p.id) end
                 if lib.callback.await('LNS_Housing:server:checkPermission', false, 'house', p.id, 'furniture') then
@@ -943,6 +946,7 @@ function RegisterPropertyZones(p, forceShell)
                 end
             end,
             onExit = function()
+                TriggerEvent('LNS_Housing:client:exitedProperty', p.id)
                 UnloadFurnitures(p.id)
                 lib.removeRadialItem('housing_furniture')
                 if InsidePropertyId == p.id then
@@ -1328,7 +1332,9 @@ function CleanUpHousingSession()
     end
 
     LeaveWalkInProperty()
+    TriggerEvent('LNS_Housing:client:exitedProperty')
     Properties = {}
+    TriggerEvent('LNS_Housing:client:propertiesChanged')
     CurrentProperty = nil
     CurrentInterior = 0
 end
@@ -1370,6 +1376,7 @@ function InitializeHousing()
 
     if Properties then
         UpdatePropertyBlips()
+        TriggerEvent('LNS_Housing:client:propertiesChanged')
 
         for id, p in pairs(Properties) do
             RegisterPropertyZones(p)
@@ -1424,6 +1431,7 @@ function InitializeHousing()
             
             InsidePropertyId = currentPropId
             TriggerServerEvent('LNS_Housing:server:enterPropertyBucket', currentPropId)
+            TriggerEvent('LNS_Housing:client:enteredProperty', currentPropId)
             LoadFurnitures(currentPropId)
 
             local currentPed = PlayerPedId()
@@ -1634,6 +1642,7 @@ RegisterNetEvent('LNS_Housing:client:updateProperties', function(allProperties)
     end
 
     UpdatePropertyBlips()
+    TriggerEvent('LNS_Housing:client:propertiesChanged')
 
     SendNUIMessage({
         action = 'updateProperties',
@@ -1904,6 +1913,7 @@ function EnterShellProperty(propertyId)
 
     InsidePropertyId = propertyId
     TriggerServerEvent('LNS_Housing:server:enterPropertyBucket', propertyId)
+    TriggerEvent('LNS_Housing:client:enteredProperty', propertyId)
     LoadFurnitures(propertyId)
 
     if lib.callback.await('LNS_Housing:server:checkPermission', false, 'house', propertyId, 'furniture') then
@@ -1935,6 +1945,7 @@ function LeaveShellProperty(propertyId)
     while not IsScreenFadedOut() do Wait(0) end
 
     UnloadFurnitures(propertyId)
+    TriggerEvent('LNS_Housing:client:exitedProperty', propertyId)
     lib.removeRadialItem('housing_furniture')
     if InsidePropertyId == propertyId then
         InsidePropertyId = nil
@@ -2252,6 +2263,7 @@ function SpawnInHouse(id)
             
             InsidePropertyId = id
             TriggerServerEvent('LNS_Housing:server:enterPropertyBucket', id)
+            TriggerEvent('LNS_Housing:client:enteredProperty', id)
             LoadFurnitures(id)
 
             if lib.callback.await('LNS_Housing:server:checkPermission', false, 'house', id, 'furniture') then

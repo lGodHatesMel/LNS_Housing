@@ -28,6 +28,13 @@ RegisterNetEvent('LNS_Housing:client:openPanel', function(propertyData)
         end
     end
 
+    propertyData.features = {
+        bin = not isApartment
+            and Settings.Cleaning ~= nil and Settings.Cleaning.Enabled == true
+            and Settings.Cleaning.Bin ~= nil and Settings.Cleaning.Bin.OwnerCanPlace == true
+            and propertyData.owner ~= nil and propertyData.owner == Bridge.Client.GetIdentifier(),
+    }
+
     propertyData.securityUpgradePrice = Settings.Security.UpgradePrice
     propertyData.doorbellCameraPrice = Settings.Security.doorbellCameraPrice
 

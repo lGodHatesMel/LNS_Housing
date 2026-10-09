@@ -371,6 +371,79 @@ return {
         }
     },
 
+    ----------------------------------------------------------------------------
+    -- Cleaning & Garbage
+    -- Master toggle for the cleaning system. When false the garbage bin is not
+    -- spawned, the bin placement option is hidden from the creator and listing editor,
+    -- and no junk appears. The loop: junk builds up inside owned houses -> the owner
+    -- sweeps it into `trash_bag` items -> bags go into the property's bin -> a full bin
+    -- becomes a stop for ghm-garbagejob workers.
+    ----------------------------------------------------------------------------
+    Cleaning = {
+        Enabled = false,
+
+        Item = 'trash_bag',                  -- ox_inventory item given for cleaned junk and taken when dumping
+
+        -- Junk that piles up inside owned houses (never apartments)
+        Junk = {
+            Enabled = true,
+            Models = { 'ghm_garbage_prop_01', 'ghm_garbage_prop_02', 'ghm_garbage_prop_03', 'ghm_dust_prop_01' },
+            IntervalMinutes = 10,            -- One piece appears per interval while someone is inside the property
+            Max = 10,                        -- Most pieces a property can hold at once
+            CleanMs = 3000,                  -- Sweep time per piece (server checks the time really elapsed)
+            InteractDistance = 2.0,          -- Distance (m) at which the "Sweep up" target shows (client only: pieces are placed on the client)
+            Cooldown = 750,                  -- Minimum ms between junk requests per player
+            MinRadius = 1.5,                 -- Pieces land on a ring around the interior entry point (m)
+            MaxRadius = 6.0,
+        },
+
+        -- Garbage bin placed per property by an agent (Creator / Edit Listing -> "Garbage Bin Location")
+        Bin = {
+            Model = 'prop_bin_07d',
+            RenderDistance = 35.0,           -- Distance (m) at which the bin spawns for a player
+            InteractDistance = 3.0,          -- Distance (m) at which the bin can be used (server check)
+            MaxDistanceFromProperty = 75.0,  -- Server check: how far from the property entrance the bin may be placed
+            OwnerCanPlace = true,            -- Owners can place, move or remove the bin from the property tablet (Settings tab)
+
+            Capacity = 12,                   -- Bags the bin holds. A full bin refuses more bags until it is emptied
+            DumpMs = 1500,                   -- Time to empty your trash bags into the bin
+            Cooldown = 750,                  -- Minimum ms between bin requests per player
+            PassiveBagsPerHour = 1,          -- Household waste: owned bins gain this many bags per real hour...
+            PassiveCap = 3,                  -- ...until they hold this many (0 turns the trickle off)
+            MinFillToCollect = 7,            -- Bags needed before ghm-garbagejob workers can empty the bin
+            CollectCooldownMinutes = 60,     -- Minimum time between two collections of the same bin
+            CollectDistance = 4.0,           -- Server check: worker distance from the bin
+            ClaimSeconds = 600,              -- How long a job reserves a bin for its crew
+            BagsPerCredit = 4,               -- A bin counts as 1 truck bag per this many bags inside it...
+            MaxCredit = 3,                   -- ...up to this many for a single bin in the job
+
+            -- Rolled when a worker empties a bin: 1 roll + 1 per `RollsPerBags` bags. Each entry rolls on its own.
+            -- `chance` is a percentage. A pricier property raises every chance by up to `ValueBonus` (0.5 = +50%),
+            -- reached at `ValueBonusPrice` (price / ValueBonusPrice, capped at 1).
+            RollsPerBags = 4,
+            ValueBonus = 0.5,
+            ValueBonusPrice = 1500000,
+            Loot = {
+                { item = 'plastic',          min = 1, max = 4, chance = 40 },
+                { item = 'glass',            min = 1, max = 3, chance = 35 },
+                { item = 'metalscrap',       min = 1, max = 4, chance = 30 },
+                { item = 'garbage',          min = 1, max = 3, chance = 30 },
+                { item = 'aluminum',         min = 1, max = 3, chance = 20 },
+                { item = 'electronickit',    min = 1, max = 1, chance = 6 },
+                { item = 'lockpick',         min = 1, max = 1, chance = 5 },
+                { item = 'goldchain',        min = 1, max = 1, chance = 1.5 },
+                { item = 'rolex',            min = 1, max = 1, chance = 1 },
+                { item = 'diamond',          min = 1, max = 1, chance = 0.5 },
+                { item = 'cash_stack',       min = 1, max = 1, chance = 1 },
+            },
+            Placement = {
+                MaxDistance = 12.0,          -- How far from the camera the placement ray reaches (m)
+                RotateStep = 5.0,            -- Degrees rotated per scroll tick
+                WaitTimeout = 300000,        -- Owner placement: ms to walk outside before the request is cancelled
+            },
+        },
+    },
+
     -- IGNORE
     Rooms = {},
 }
