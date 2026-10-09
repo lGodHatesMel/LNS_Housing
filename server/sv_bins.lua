@@ -1,8 +1,9 @@
 local Settings = lib.load('shared.settings')
 
--- Garbage bin fill level. Stored in the property metadata (bin_fill, bin_emptied_at, bin_passive_at) and saved in
--- batches (MarkCleaningDirty). Owners and keyholders dump trash bags into the bin. What happens to a full bin is up to
--- the server: the exports at the bottom let another resource read the fill level and empty or change it.
+-- Garbage bin. Owners and keyholders dump trash bags into it.
+-- With Bin.KeepContents off (default) the bags are simply thrown away and the bin never fills.
+-- With it on, the bags stay in the bin: the fill level is stored in the property metadata (bin_fill, bin_emptied_at),
+-- saved in batches (MarkCleaningDirty), and the exports at the bottom let another resource read, empty or change it.
 
 local LastAction = {} -- [src] = GetGameTimer()
 
@@ -24,7 +25,12 @@ local function GetBinProperty(propertyId)
     return id, p
 end
 
+local function KeepContents()
+    return Cfg().KeepContents == true
+end
+
 local function GetFill(p)
+    if not KeepContents() then return 0 end
     return math.min(Capacity(), math.max(0, math.floor(tonumber(p.metadata.bin_fill) or 0)))
 end
 
@@ -32,7 +38,7 @@ local function SetFill(id, p, fill)
     fill = math.min(Capacity(), math.max(0, math.floor(fill)))
     if fill == GetFill(p) then return end
 
-    p.metadata.bin_fill = fill
+    p.metadata.bin_fill = fill ~= 0 and fill or nil
     MarkCleaningDirty(id)
     TriggerClientEvent('LNS_Housing:client:binFill', -1, id, fill)
     TriggerEvent('LNS_Housing:server:binFillChanged', id, fill, Capacity())
@@ -86,7 +92,8 @@ local function GetPropertyBags(src, propertyId)
     return slots, matching, total
 end
 
----Moves the trash bags the player swept up in this property into the bin, as many as fit.
+---Takes the trash bags the player swept up in this property. They are thrown away, or kept in the bin (as many as fit)
+---when Bin.KeepContents is on.
 ---Bags from another property, or bags that never came from sweeping, are ignored.
 lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
     if Throttled(src) then return { ok = false } end
@@ -103,9 +110,9 @@ lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
     end
 
     local fill = GetFill(p)
-    local room = Capacity() - fill
+    local room = KeepContents() and Capacity() - fill or carried
     if room < 1 then
-        return { ok = false, reason = 'The bin is full. Wait for the garbage crew to empty it.' }
+        return { ok = false, reason = 'The bin is full.' }
     end
 
     local wanted = math.min(carried, room)
@@ -119,41 +126,11 @@ lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
     end
     if removed < 1 then return { ok = false } end
 
+    -- Thrown away: nothing is kept, so there is no fill level to report
+    if not KeepContents() then return { ok = true, added = removed } end
+
     SetFill(id, p, fill + removed)
     return { ok = true, added = removed, fill = fill + removed, capacity = Capacity() }
-end)
-
---------------------------------------------------------------------------------
--- Household waste: owned bins slowly gain a few bags on their own
---------------------------------------------------------------------------------
-
-CreateThread(function()
-    while true do
-        Wait(60000)
-
-        local perHour, cap = Cfg().PassiveBagsPerHour or 0, math.min(Cfg().PassiveCap or 0, Capacity())
-        if IsCleaningEnabled() and perHour > 0 and cap > 0 then
-            local now = os.time()
-            for id, p in pairs(Properties) do
-                if GetBinProperty(id) then
-                    local last = tonumber(p.metadata.bin_passive_at)
-                    if not last then
-                        p.metadata.bin_passive_at = now
-                        MarkCleaningDirty(id)
-                    elseif GetFill(p) >= cap then
-                        -- Do not bank time while the bin is already as full as the trickle goes
-                        p.metadata.bin_passive_at = now
-                    else
-                        local gain = math.floor((now - last) * perHour / 3600)
-                        if gain >= 1 then
-                            p.metadata.bin_passive_at = last + math.floor(gain * 3600 / perHour)
-                            SetFill(id, p, math.min(cap, GetFill(p) + gain))
-                        end
-                    end
-                end
-            end
-        end
-    end
 end)
 
 -- Removing the bin takes its contents and last-emptied time with it, so a moved bin starts fresh
@@ -163,7 +140,6 @@ AddEventHandler('LNS_Housing:server:binChanged', function(id, bin)
 
     if p.metadata then
         p.metadata.bin_fill = nil
-        p.metadata.bin_passive_at = nil
         p.metadata.bin_emptied_at = nil
         MarkCleaningDirty(id)
     end
@@ -212,23 +188,24 @@ exports('GetPropertyBin', function(propertyId)
 end)
 
 ---Sets how many bags are in a bin (clamped to the capacity). Players and the bin prop update straight away.
+---Only works when Bin.KeepContents is on.
 ---@return boolean ok
 exports('SetBinFill', function(propertyId, fill)
     local id, p = GetBinProperty(propertyId)
     fill = tonumber(fill)
-    if not id or not fill then return false end
+    if not id or not fill or not KeepContents() then return false end
 
     SetFill(id, p, fill)
     return true
 end)
 
----Empties a bin and records when. The owner is told.
+---Empties a bin and records when. The owner is told. Only works when Bin.KeepContents is on.
 ---@param propertyId number
 ---@param src number? the player who emptied it, passed on in the binEmptied event
 ---@return { ok: boolean, bags: integer? }
 exports('EmptyBin', function(propertyId, src)
     local id, p = GetBinProperty(propertyId)
-    if not id then return { ok = false } end
+    if not id or not KeepContents() then return { ok = false } end
 
     local bags = GetFill(p)
     p.metadata.bin_emptied_at = os.time()

@@ -278,7 +278,11 @@ local function DumpTrash(propertyId)
     if completed then
         local result = lib.callback.await('LNS_Housing:server:bin:dump', false, propertyId)
         if result and result.ok then
-            Bridge.Client.Notify(('Dumped %d bag(s). The bin is %d/%d full.'):format(result.added, result.fill, result.capacity), 'success')
+            if result.capacity then
+                Bridge.Client.Notify(('Dumped %d bag(s). The bin is %d/%d full.'):format(result.added, result.fill, result.capacity), 'success')
+            else
+                Bridge.Client.Notify(('You threw away %d bag(s).'):format(result.added), 'success')
+            end
         elseif result and result.reason then
             Bridge.Client.Notify(result.reason, 'error')
         end
@@ -325,7 +329,7 @@ local function SpawnBin(entry)
     FreezeEntityPosition(entity, true)
     entry.entity = entity
 
-    exports.ox_target:addLocalEntity(entity, {
+    local options = {
         {
             name = ('lns_bin_dump_%s'):format(entry.propertyId),
             label = 'Dump trash bags',
@@ -334,14 +338,17 @@ local function SpawnBin(entry)
             canInteract = function() return CarriesTrashBag(entry.propertyId) end,
             onSelect = function() DumpTrash(entry.propertyId) end,
         },
-        {
+    }
+    if BinConfig().KeepContents == true then
+        options[#options + 1] = {
             name = ('lns_bin_check_%s'):format(entry.propertyId),
             label = 'Check bin',
             icon = 'fa-solid fa-trash-can',
             distance = BinConfig().InteractDistance or 3.0,
             onSelect = function() CheckBin(entry.propertyId) end,
-        },
-    })
+        }
+    end
+    exports.ox_target:addLocalEntity(entity, options)
 
     local fill, capacity = lib.callback.await('LNS_Housing:server:bin:getFill', false, entry.propertyId)
     entry.fill, entry.capacity = fill or 0, capacity or BinConfig().Capacity or 12

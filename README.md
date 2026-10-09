@@ -49,10 +49,10 @@ Rather than just a simple spawn-and-teleport script, **LNS Housing** introduces 
 Off by default. Turn it on with `Cleaning.Enabled = true` in `shared/settings.lua`.
 * **Junk builds up:** While someone is inside an owned house, a piece of junk appears every few minutes (`Cleaning.Junk`, up to 10 at a time). Apartments are not affected.
 * **Keyholders clean it:** The owner and anyone with a key use the "Sweep up" target on a piece to bag it. Each piece gives one `trash_bag` item tagged with the property it came from, so a bin only accepts bags swept up in its own house.
-* **Bring it outside:** Bags go into the property's garbage bin with "Dump trash bags". The bin holds `Cleaning.Bin.Capacity` bags, shows bags piled beside it as it fills, and refuses more when full.
+* **Bring it outside:** Bags go into the property's garbage bin with "Dump trash bags". By default they simply disappear. With `Bin.KeepContents = true` they stay in the bin (up to `Bin.Capacity`, shown as a pile beside it) so other scripts can use them.
 * **Bin placement:** Agents place the bin in the listing editor ("Garbage Bin Location"). Owners can place, move or remove it from the property tablet (Settings tab).
 * **Full guide:** see [Install/junk.md](Install/junk.md) for setup, every setting and troubleshooting.
-* **Build your own pickup:** Server exports (`GetPropertyBins`, `SetBinFill`, `EmptyBin`) let any job or script decide what happens to a full bin.
+* **Build your own pickup:** Server exports (`GetPropertyBins`, `SetBinFill`, `EmptyBin`) let any job or script decide what happens to the bags in a bin (needs `Bin.KeepContents = true`).
 
 Requires an `ox_inventory` item named `trash_bag`:
 ```lua

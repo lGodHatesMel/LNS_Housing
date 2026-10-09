@@ -1,8 +1,9 @@
 # Junk, Trash Bags & Garbage Bins
 
 Houses get messy. While someone is home, junk piles up. People with a key sweep it into trash bags,
-carry the bags outside and dump them in the house's garbage bin. What happens to a full bin is up to your
-server: this resource does not include a garbage job, but it gives other resources the exports to build one.
+carry the bags outside and dump them in the house's garbage bin. What happens to them after that is up to your
+server: by default the bags just disappear. If you turn on `Bin.KeepContents`, they stay in the bin and other
+resources can use them through the exports (for example to build a garbage job).
 
 This page explains how it works, how to switch it on or off, and how to set it up.
 
@@ -56,13 +57,13 @@ There are two switches in `shared/settings.lua` under `Cleaning`:
 |---|---|---|
 | `false` | any | Everything is off. |
 | `true` | `true` | Junk, trash bags and bins all work. |
-| `true` | `false` | No junk. Bins can still be placed and used, and still fill up slowly by themselves. |
+| `true` | `false` | No junk. Bins can still be placed, but with no junk there are no bags to put in them. |
 
 Notes:
 - Restart the resource after changing a setting.
 - Turning the system off does not delete anything. Junk and bin contents stay saved on the property and
   come back if you turn it on again.
-- To stop bins filling by themselves without turning anything off, set `Bin.PassiveBagsPerHour = 0`.
+- Bins never fill by themselves. Only bags that players bring from cleaning their house go in.
 - Owners can only place or move their own bin from the property tablet when `Bin.OwnerCanPlace = true`.
 
 ---
@@ -93,15 +94,20 @@ Notes:
 ### Bringing it outside
 
 - Each house with a bin has a garbage bin prop outside.
-- The **Dump trash bags** target on the bin moves the player's bags for that house into the bin
-  (`Bin.DumpMs`). The target only shows if the player is carrying bags from that house.
-- The **Check bin** target shows how full it is and when it was last emptied.
-- A bin holds `Bin.Capacity` bags (default 12). When it is full it refuses more bags. The player keeps the
-  rest until the bin is emptied.
-- Bags pile up beside the bin as it fills: 1 bag at half full, 3 at three quarters, 4 when full.
-- Bins also gain a few bags on their own over time, representing normal household waste
-  (`Bin.PassiveBagsPerHour`, up to `Bin.PassiveCap`).
+- The **Dump trash bags** target on the bin takes the player's bags for that house (`Bin.DumpMs`). The target
+  only shows if the player is carrying bags from that house.
+- What happens to the bags depends on `Bin.KeepContents`, see below.
+- A bin only ever holds bags that players put in it. It does not fill by itself.
 
+### What happens to the bags
+
+| `Bin.KeepContents` | What happens |
+|---|---|
+| `false` (default) | The bags are thrown away. The bin never fills, so it can never be full. There is no "Check bin" target and no pile of bags. |
+| `true` | The bags stay in the bin. It holds `Bin.Capacity` bags (default 12); when it is full it refuses more and the player keeps the rest. Bags pile up beside the bin as it fills (1 at half full, 3 at three quarters, 4 when full), and a **Check bin** target shows the fill level and when it was last emptied. |
+
+With `KeepContents = true` nothing empties the bin on its own. Another resource has to do that, see
+[Building on the bin exports](#7-building-on-the-bin-exports).
 ### Bags only count for their own house
 
 Each `trash_bag` is created with the property ID attached, and the inventory shows "Junk from <house name>".
@@ -110,13 +116,6 @@ The bin only accepts bags tagged for its own property. Bags from another house, 
 the house it belongs to. Bags of the same house stack together.
 
 If `trash_bag` items existed before you installed this, they have no tag and will not be accepted by any bin.
-
-### What happens to a full bin
-
-Nothing, by default. A full bin refuses more bags until something empties it. The resource has no garbage job,
-pay, loot or cooldown built in, so you can decide what a full bin means on your server (a garbage job, a
-pickup request, a fee for a neglected bin, a dumpster-diving mechanic, and so on). See
-[Building on the bin exports](#7-building-on-the-bin-exports).
 
 ---
 
@@ -172,11 +171,10 @@ All settings are in `shared/settings.lua` under `Cleaning`.
 | `Bin.InteractDistance` | `3.0` | Distance at which the bin can be used (also checked by the server). |
 | `Bin.MaxDistanceFromProperty` | `75.0` | How far from the entrance a bin can be placed. |
 | `Bin.OwnerCanPlace` | `true` | Owners can place, move and remove their bin from the tablet. |
-| `Bin.Capacity` | `12` | Bags a bin holds. |
+| `Bin.KeepContents` | `false` | `false`: bags put in the bin disappear and the bin never fills. `true`: the bags stay in the bin so other resources can use them. |
+| `Bin.Capacity` | `12` | Only used when `KeepContents` is `true`. How many bags the bin holds before it refuses more. |
 | `Bin.DumpMs` | `1500` | Time to dump your bags. |
 | `Bin.Cooldown` | `750` | Minimum ms between bin requests per player. |
-| `Bin.PassiveBagsPerHour` | `1` | Bags a bin gains by itself per real hour. `0` turns this off. |
-| `Bin.PassiveCap` | `3` | The bags-by-themselves trickle stops at this many. |
 | `Bin.Placement.MaxDistance` | `12.0` | How far the placement ray reaches. |
 | `Bin.Placement.RotateStep` | `5.0` | Degrees per scroll tick. |
 | `Bin.Placement.WaitTimeout` | `300000` | Owner placement: ms to walk outside before it cancels. |
@@ -189,10 +187,10 @@ All settings are in `shared/settings.lua` under `Cleaning`.
 
 | Export | Returns |
 |---|---|
-| `GetPropertyBins(minFill?)` | Every bin in service as `{ propertyId, label, coords, fill, capacity, emptiedAt }`. Pass `minFill` to only get bins holding at least that many bags. Empty when the system is off. |
+| `GetPropertyBins(minFill?)` | Every bin in service as `{ propertyId, label, coords, fill, capacity, emptiedAt }`. Pass `minFill` to only get bins holding at least that many bags. Empty when the system is off. `fill` is always `0` unless `Bin.KeepContents` is on. |
 | `GetPropertyBin(propertyId)` | The same table for one property, or `nil` if it has no bin in service. |
-| `SetBinFill(propertyId, fill)` | Sets how many bags are in a bin (clamped to the capacity). Returns `boolean`. |
-| `EmptyBin(propertyId, src?)` | Empties a bin, records the time, tells the owner and fires `binEmptied`. Returns `{ ok, bags? }`. |
+| `SetBinFill(propertyId, fill)` | Sets how many bags are in a bin (clamped to the capacity). Returns `boolean`. Needs `Bin.KeepContents`. |
+| `EmptyBin(propertyId, src?)` | Empties a bin, records the time, tells the owner and fires `binEmptied`. Returns `{ ok, bags? }`. Needs `Bin.KeepContents`. |
 | `GetPropertyJunk(propertyId)` | Number of junk pieces in a house, or `nil` for apartments. |
 | `GetPropertyOccupants(propertyId)` | Player IDs currently inside a property. |
 
@@ -209,14 +207,15 @@ All settings are in `shared/settings.lua` under `Cleaning`.
 
 | Event | Arguments | When |
 |---|---|---|
-| `LNS_Housing:server:binFillChanged` | `propertyId, fill, capacity` | A bin's fill level changed (dumped, trickle, `SetBinFill`, emptied). |
+| `LNS_Housing:server:binFillChanged` | `propertyId, fill, capacity` | A bin's fill level changed (bags dumped, `SetBinFill`, emptied). |
 | `LNS_Housing:server:binEmptied` | `propertyId, src, bags` | `EmptyBin` was called. `src` is whatever you passed, or `nil`. |
 
 ---
 
 ## 7. Building on the bin exports
 
-The exports above trust the resource that calls them. `EmptyBin` and `SetBinFill` do not check who is asking,
+These need `Bin.KeepContents = true`, otherwise the bags are thrown away and there is nothing in the bin to work
+with. The exports trust the resource that calls them. `EmptyBin` and `SetBinFill` do not check who is asking,
 how close they are or whether they are on a job, so **do those checks in your own resource** before calling them.
 
 A simple pickup job could look like this:
@@ -277,5 +276,6 @@ All of these happen on the server, so a modified client cannot get around them:
 | "Dump trash bags" doesn't show | The player must carry bags swept up in **that** house. Bags from other houses don't count. |
 | "These trash bags are not from this property." | The bags are from a different house, or untagged bags from before the update. |
 | Junk floats or sits in walls | Pieces sit on a ring around the entry point. Lower `Junk.MaxRadius`, or raise `MinRadius`, for small or oddly shaped interiors. |
-| The bin never gets emptied | Nothing empties it by default. Use `EmptyBin` from your own job or script (see [Building on the bin exports](#7-building-on-the-bin-exports)). |
+| The bin never gets emptied | Nothing empties it on its own. With `Bin.KeepContents = true`, use `EmptyBin` from your own job or script (see [Building on the bin exports](#7-building-on-the-bin-exports)). |
+| The bin never fills or shows a pile of bags | `Bin.KeepContents` is `false` (the default), so dumped bags are thrown away. |
 | Changes to settings do nothing | Restart the resource. |

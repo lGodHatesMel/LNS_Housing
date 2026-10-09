@@ -405,11 +405,11 @@ return {
             MaxDistanceFromProperty = 75.0,  -- Server check: how far from the property entrance the bin may be placed
             OwnerCanPlace = true,            -- Owners can place, move or remove the bin from the property tablet (Settings tab)
 
-            Capacity = 12,                   -- Bags the bin holds. A full bin refuses more bags until it is emptied
+            KeepContents = false,            -- false: bags dumped in the bin simply disappear and the bin never fills.
+                                             -- true: they stay in the bin (shown as a pile, readable and emptiable through the bin exports)
+            Capacity = 12,                   -- Only used when KeepContents is true: bags the bin holds. A full bin refuses more bags until it is emptied
             DumpMs = 1500,                   -- Time to empty your trash bags into the bin
             Cooldown = 750,                  -- Minimum ms between bin requests per player
-            PassiveBagsPerHour = 1,          -- Household waste: owned bins gain this many bags per real hour...
-            PassiveCap = 3,                  -- ...until they hold this many (0 turns the trickle off)
 
             Placement = {
                 MaxDistance = 12.0,          -- How far from the camera the placement ray reaches (m)
