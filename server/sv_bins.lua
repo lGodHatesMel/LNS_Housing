@@ -70,7 +70,24 @@ lib.callback.register('LNS_Housing:server:bin:getFill', function(src, propertyId
     return GetFill(p), Capacity(), tonumber(p.metadata.bin_emptied_at) or 0
 end)
 
----Moves the trash bags the player carries into the bin, as many as fit.
+---Trash bags in the player's inventory that were swept up in this property.
+---@return { slot: integer, count: integer }[] slots, integer matching, integer total
+local function GetPropertyBags(src, propertyId)
+    local item = Settings.Cleaning.Item or 'trash_bag'
+    local slots, matching, total = {}, 0, 0
+
+    for _, slot in pairs(exports.ox_inventory:Search(src, 'slots', item) or {}) do
+        total = total + slot.count
+        if slot.metadata and tonumber(slot.metadata.property) == propertyId then
+            matching = matching + slot.count
+            slots[#slots + 1] = { slot = slot.slot, count = slot.count }
+        end
+    end
+    return slots, matching, total
+end
+
+---Moves the trash bags the player swept up in this property into the bin, as many as fit.
+---Bags from another property, or bags that never came from sweeping, are ignored.
 lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
     if Throttled(src) then return { ok = false } end
 
@@ -80,8 +97,10 @@ lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
     if not IsNear(src, BinPosition(p), (Cfg().InteractDistance or 3.0) + 1.5) then return { ok = false } end
 
     local item = Settings.Cleaning.Item or 'trash_bag'
-    local carried = exports.ox_inventory:GetItem(src, item, nil, true) or 0
-    if carried < 1 then return { ok = false, reason = 'You have no trash bags.' } end
+    local slots, carried, total = GetPropertyBags(src, id)
+    if carried < 1 then
+        return { ok = false, reason = total > 0 and 'These trash bags are not from this property.' or 'You have no trash bags.' }
+    end
 
     local fill = GetFill(p)
     local room = Capacity() - fill
@@ -89,11 +108,19 @@ lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
         return { ok = false, reason = 'The bin is full. Wait for the garbage crew to empty it.' }
     end
 
-    local amount = math.min(carried, room)
-    if not exports.ox_inventory:RemoveItem(src, item, amount) then return { ok = false } end
+    local wanted = math.min(carried, room)
+    local removed = 0
+    for _, entry in ipairs(slots) do
+        if removed >= wanted then break end
+        local take = math.min(entry.count, wanted - removed)
+        if exports.ox_inventory:RemoveItem(src, item, take, nil, entry.slot) then
+            removed = removed + take
+        end
+    end
+    if removed < 1 then return { ok = false } end
 
-    SetFill(id, p, fill + amount)
-    return { ok = true, added = amount, fill = fill + amount, capacity = Capacity() }
+    SetFill(id, p, fill + removed)
+    return { ok = true, added = removed, fill = fill + removed, capacity = Capacity() }
 end)
 
 --------------------------------------------------------------------------------

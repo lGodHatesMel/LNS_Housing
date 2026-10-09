@@ -297,9 +297,13 @@ local function CheckBin(propertyId)
     Bridge.Client.Notify(text, 'inform')
 end
 
-local function CarriesTrashBag()
+---True when the player carries a trash bag swept up in this property (the server checks again when dumping)
+local function CarriesTrashBag(propertyId)
     local item = Settings.Cleaning.Item or 'trash_bag'
-    return (exports.ox_inventory:Search('count', item) or 0) > 0
+    for _, slot in pairs(exports.ox_inventory:Search('slots', item) or {}) do
+        if slot.metadata and tonumber(slot.metadata.property) == propertyId then return true end
+    end
+    return false
 end
 
 local function SpawnBin(entry)
@@ -327,7 +331,7 @@ local function SpawnBin(entry)
             label = 'Dump trash bags',
             icon = 'fa-solid fa-dumpster',
             distance = BinConfig().InteractDistance or 3.0,
-            canInteract = CarriesTrashBag,
+            canInteract = function() return CarriesTrashBag(entry.propertyId) end,
             onSelect = function() DumpTrash(entry.propertyId) end,
         },
         {
