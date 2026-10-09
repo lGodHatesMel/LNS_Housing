@@ -1,11 +1,10 @@
 local Settings = lib.load('shared.settings')
 
 -- Garbage bin fill level. Stored in the property metadata (bin_fill, bin_emptied_at, bin_passive_at) and saved in
--- batches (MarkCleaningDirty). Owners and keyholders dump trash bags into the bin; ghm-garbagejob workers empty it
--- through the exports at the bottom. The job never changes the fill itself.
+-- batches (MarkCleaningDirty). Owners and keyholders dump trash bags into the bin. What happens to a full bin is up to
+-- the server: the exports at the bottom let another resource read the fill level and empty or change it.
 
 local LastAction = {} -- [src] = GetGameTimer()
-local Claims = {}     -- [propertyId] = { owner = string, expires = os.time() }
 
 local function Cfg()
     return Settings.Cleaning and Settings.Cleaning.Bin or {}
@@ -36,6 +35,7 @@ local function SetFill(id, p, fill)
     p.metadata.bin_fill = fill
     MarkCleaningDirty(id)
     TriggerClientEvent('LNS_Housing:client:binFill', -1, id, fill)
+    TriggerEvent('LNS_Housing:server:binFillChanged', id, fill, Capacity())
 end
 
 local function BinPosition(p)
@@ -156,12 +156,11 @@ CreateThread(function()
     end
 end)
 
--- Removing the bin takes its contents with it, so moving it cannot be used to dodge the collection cooldown
+-- Removing the bin takes its contents and last-emptied time with it, so a moved bin starts fresh
 AddEventHandler('LNS_Housing:server:binChanged', function(id, bin)
     local p = Properties[id]
     if not p or bin then return end
 
-    Claims[id] = nil
     if p.metadata then
         p.metadata.bin_fill = nil
         p.metadata.bin_passive_at = nil
@@ -176,122 +175,63 @@ AddEventHandler('playerDropped', function()
 end)
 
 --------------------------------------------------------------------------------
--- Garbage job exports (ghm-garbagejob)
+-- Exports for other resources
+-- These trust the calling resource: it has to do its own checks (job, distance, cooldowns) before calling them.
 --------------------------------------------------------------------------------
 
-local function WorkerCanCollect(src)
-    if GetResourceState('ghm-garbagejob') ~= 'started' then return false end
-    local ok, result = pcall(function() return exports['ghm-garbagejob']:CanCollectBin(src) end)
-    return ok and result == true
+local function BinInfo(id, p)
+    return {
+        propertyId = id,
+        label = p.label,
+        coords = p.metadata.bin_coords,
+        fill = GetFill(p),
+        capacity = Capacity(),
+        emptiedAt = tonumber(p.metadata.bin_emptied_at) or 0,
+    }
 end
 
-local function IsCollectable(id, p, minFill, now)
-    if GetFill(p) < minFill then return false end
+---Every bin in service, optionally only those holding at least `minFill` bags.
+---@param minFill integer?
+---@return { propertyId: number, label: string, coords: table, fill: integer, capacity: integer, emptiedAt: integer }[]
+exports('GetPropertyBins', function(minFill)
+    local bins = {}
+    minFill = tonumber(minFill) or 0
 
-    local cooldown = (Cfg().CollectCooldownMinutes or 60) * 60
-    return now - (tonumber(p.metadata.bin_emptied_at) or 0) >= cooldown
-end
-
-local function ClaimFor(id, now)
-    local claim = Claims[id]
-    if claim and claim.expires <= now then
-        Claims[id] = nil
-        return nil
-    end
-    return claim
-end
-
----Bins that are full enough to empty and not reserved by another crew.
----@param minFill integer? defaults to Bin.MinFillToCollect
----@return { propertyId: number, label: string, coords: table, fill: integer }[]
-exports('GetCollectableBins', function(minFill)
-    local list = {}
-    minFill = tonumber(minFill) or Cfg().MinFillToCollect or 7
-
-    local now = os.time()
     for id, p in pairs(Properties) do
-        if GetBinProperty(id) and IsCollectable(id, p, minFill, now) and not ClaimFor(id, now) then
-            list[#list + 1] = { propertyId = id, label = p.label, coords = p.metadata.bin_coords, fill = GetFill(p) }
+        if GetBinProperty(id) and GetFill(p) >= minFill then
+            bins[#bins + 1] = BinInfo(id, p)
         end
     end
-    return list
+    return bins
 end)
 
----Reserves a bin for a crew for Bin.ClaimSeconds so two crews do not chase the same one.
----@param owner string any id that names the crew; the same value is passed to CollectBin and ReleaseBin
----@return boolean
-exports('ClaimBin', function(src, propertyId, owner)
+---@return { propertyId: number, label: string, coords: table, fill: integer, capacity: integer, emptiedAt: integer }? nil when the property has no bin in service
+exports('GetPropertyBin', function(propertyId)
     local id, p = GetBinProperty(propertyId)
-    if not id or not owner then return false end
+    return id and BinInfo(id, p) or nil
+end)
 
-    local now = os.time()
-    local claim = ClaimFor(id, now)
-    if claim and claim.owner ~= tostring(owner) then return false end
-    if not IsCollectable(id, p, Cfg().MinFillToCollect or 7, now) then return false end
-    if CanUseBin(src, id, p) then return false end
+---Sets how many bags are in a bin (clamped to the capacity). Players and the bin prop update straight away.
+---@return boolean ok
+exports('SetBinFill', function(propertyId, fill)
+    local id, p = GetBinProperty(propertyId)
+    fill = tonumber(fill)
+    if not id or not fill then return false end
 
-    Claims[id] = { owner = tostring(owner), expires = now + (Cfg().ClaimSeconds or 600) }
+    SetFill(id, p, fill)
     return true
 end)
 
-exports('ReleaseBin', function(propertyId, owner)
-    local id = tonumber(propertyId)
-    local claim = id and Claims[id]
-    if claim and claim.owner == tostring(owner) then Claims[id] = nil end
-end)
-
-local function RollLoot(p, bags)
-    local cfg = Cfg()
-    local rolls = 1 + math.floor(bags / math.max(1, cfg.RollsPerBags or 4))
-    local price = tonumber(p.price) or 0
-    local boost = 1.0 + (cfg.ValueBonus or 0) * math.min(1.0, price / math.max(1, cfg.ValueBonusPrice or 1))
-
-    local totals, order = {}, {}
-    for _ = 1, rolls do
-        for _, entry in ipairs(cfg.Loot or {}) do
-            if math.random() * 100.0 < (entry.chance or 0) * boost and exports.ox_inventory:Items(entry.item) then
-                local count = math.random(entry.min or 1, entry.max or entry.min or 1)
-                if not totals[entry.item] then
-                    totals[entry.item] = 0
-                    order[#order + 1] = entry.item
-                end
-                totals[entry.item] = totals[entry.item] + count
-            end
-        end
-    end
-
-    local loot = {}
-    for _, name in ipairs(order) do loot[#loot + 1] = { item = name, count = totals[name] } end
-    return loot
-end
-
----Empties a bin for a garbage worker. All checks happen here; the job only passes who is asking.
----@param src number the worker
+---Empties a bin and records when. The owner is told.
 ---@param propertyId number
----@param owner string the crew id used with ClaimBin
----@return { ok: boolean, reason: string?, bags: integer?, credit: integer?, loot: { item: string, count: integer }[]?, label: string? }
-exports('CollectBin', function(src, propertyId, owner)
+---@param src number? the player who emptied it, passed on in the binEmptied event
+---@return { ok: boolean, bags: integer? }
+exports('EmptyBin', function(propertyId, src)
     local id, p = GetBinProperty(propertyId)
-    if not id then return { ok = false, reason = 'This bin is not in service.' } end
-
-    if not WorkerCanCollect(src) then return { ok = false, reason = 'You are not on a garbage run.' } end
-    if not IsNear(src, BinPosition(p), Cfg().CollectDistance or 4.0) then return { ok = false, reason = 'Too far from the bin.' } end
-    if CanUseBin(src, id, p) then return { ok = false, reason = 'You cannot empty your own bin.' } end
-
-    local now = os.time()
-    local claim = ClaimFor(id, now)
-    if claim and claim.owner ~= tostring(owner) then return { ok = false, reason = 'Another crew is on this bin.' } end
-
-    if not IsCollectable(id, p, Cfg().MinFillToCollect or 7, now) then
-        return { ok = false, reason = 'This bin is not full enough to empty yet.' }
-    end
+    if not id then return { ok = false } end
 
     local bags = GetFill(p)
-    local credit = math.min(Cfg().MaxCredit or 3, math.max(1, math.ceil(bags / math.max(1, Cfg().BagsPerCredit or 4))))
-    local loot = RollLoot(p, bags)
-
-    Claims[id] = nil
-    p.metadata.bin_emptied_at = now
+    p.metadata.bin_emptied_at = os.time()
     SetFill(id, p, 0)
     MarkCleaningDirty(id)
 
@@ -300,8 +240,8 @@ exports('CollectBin', function(src, propertyId, owner)
     local ownerPlayer = Bridge.Server.IsPlayerOnline(p.owner)
     local ownerSrc = ownerPlayer and ownerPlayer.PlayerData and ownerPlayer.PlayerData.source
     if ownerSrc then
-        Bridge.Server.Notify(ownerSrc, ('The garbage crew emptied the bin at %s.'):format(p.label or 'your property'), 'inform')
+        Bridge.Server.Notify(ownerSrc, ('Your bin at %s was emptied.'):format(p.label or 'your property'), 'inform')
     end
 
-    return { ok = true, bags = bags, credit = credit, loot = loot, label = p.label }
+    return { ok = true, bags = bags }
 end)

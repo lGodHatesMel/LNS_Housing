@@ -376,8 +376,8 @@ return {
     -- Master toggle for the cleaning system. When false the garbage bin is not
     -- spawned, the bin placement option is hidden from the creator and listing editor,
     -- and no junk appears. The loop: junk builds up inside owned houses -> the owner
-    -- sweeps it into `trash_bag` items -> bags go into the property's bin -> a full bin
-    -- becomes a stop for ghm-garbagejob workers.
+    -- sweeps it into `trash_bag` items -> bags go into the property's bin. What happens to a
+    -- full bin is up to your server: see the bin exports in Install/junk.md.
     ----------------------------------------------------------------------------
     Cleaning = {
         Enabled = false,
@@ -410,32 +410,7 @@ return {
             Cooldown = 750,                  -- Minimum ms between bin requests per player
             PassiveBagsPerHour = 1,          -- Household waste: owned bins gain this many bags per real hour...
             PassiveCap = 3,                  -- ...until they hold this many (0 turns the trickle off)
-            MinFillToCollect = 7,            -- Bags needed before ghm-garbagejob workers can empty the bin
-            CollectCooldownMinutes = 60,     -- Minimum time between two collections of the same bin
-            CollectDistance = 4.0,           -- Server check: worker distance from the bin
-            ClaimSeconds = 600,              -- How long a job reserves a bin for its crew
-            BagsPerCredit = 4,               -- A bin counts as 1 truck bag per this many bags inside it...
-            MaxCredit = 3,                   -- ...up to this many for a single bin in the job
 
-            -- Rolled when a worker empties a bin: 1 roll + 1 per `RollsPerBags` bags. Each entry rolls on its own.
-            -- `chance` is a percentage. A pricier property raises every chance by up to `ValueBonus` (0.5 = +50%),
-            -- reached at `ValueBonusPrice` (price / ValueBonusPrice, capped at 1).
-            RollsPerBags = 4,
-            ValueBonus = 0.5,
-            ValueBonusPrice = 1500000,
-            Loot = {
-                { item = 'plastic',          min = 1, max = 4, chance = 40 },
-                { item = 'glass',            min = 1, max = 3, chance = 35 },
-                { item = 'metalscrap',       min = 1, max = 4, chance = 30 },
-                { item = 'garbage',          min = 1, max = 3, chance = 30 },
-                { item = 'aluminum',         min = 1, max = 3, chance = 20 },
-                { item = 'electronickit',    min = 1, max = 1, chance = 6 },
-                { item = 'lockpick',         min = 1, max = 1, chance = 5 },
-                { item = 'goldchain',        min = 1, max = 1, chance = 1.5 },
-                { item = 'rolex',            min = 1, max = 1, chance = 1 },
-                { item = 'diamond',          min = 1, max = 1, chance = 0.5 },
-                { item = 'cash_stack',       min = 1, max = 1, chance = 1 },
-            },
             Placement = {
                 MaxDistance = 12.0,          -- How far from the camera the placement ray reaches (m)
                 RotateStep = 5.0,            -- Degrees rotated per scroll tick

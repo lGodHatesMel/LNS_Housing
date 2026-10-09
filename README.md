@@ -52,7 +52,7 @@ Off by default. Turn it on with `Cleaning.Enabled = true` in `shared/settings.lu
 * **Bring it outside:** Bags go into the property's garbage bin with "Dump trash bags". The bin holds `Cleaning.Bin.Capacity` bags, shows bags piled beside it as it fills, and refuses more when full.
 * **Bin placement:** Agents place the bin in the listing editor ("Garbage Bin Location"). Owners can place, move or remove it from the property tablet (Settings tab).
 * **Full guide:** see [Install/junk.md](Install/junk.md) for setup, every setting and troubleshooting.
-* **Garbage job hook:** Exports let a garbage job empty full bins (`GetCollectableBins`, `ClaimBin`, `ReleaseBin`, `CollectBin`).
+* **Build your own pickup:** Server exports (`GetPropertyBins`, `SetBinFill`, `EmptyBin`) let any job or script decide what happens to a full bin.
 
 Requires an `ox_inventory` item named `trash_bag`:
 ```lua

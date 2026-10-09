@@ -1,8 +1,8 @@
 # Junk, Trash Bags & Garbage Bins
 
 Houses get messy. While someone is home, junk piles up. People with a key sweep it into trash bags,
-carry the bags outside and dump them in the house's garbage bin. A full bin can then be emptied by a
-garbage job.
+carry the bags outside and dump them in the house's garbage bin. What happens to a full bin is up to your
+server: this resource does not include a garbage job, but it gives other resources the exports to build one.
 
 This page explains how it works, how to switch it on or off, and how to set it up.
 
@@ -111,19 +111,12 @@ the house it belongs to. Bags of the same house stack together.
 
 If `trash_bag` items existed before you installed this, they have no tag and will not be accepted by any bin.
 
-### Emptying the bin (garbage job)
+### What happens to a full bin
 
-A full bin can be emptied by a garbage job. The built-in hooks are written for `ghm-garbagejob`:
-
-- A bin becomes collectable when it holds at least `Bin.MinFillToCollect` bags (default 7) and the last
-  collection was more than `Bin.CollectCooldownMinutes` ago (default 60).
-- The job reserves a bin for its crew for `Bin.ClaimSeconds` so two crews do not chase the same one.
-- Emptying a bin counts as `ceil(bags / BagsPerCredit)` truck bags, capped at `Bin.MaxCredit`.
-- Each emptied bin also rolls the `Bin.Loot` table (see [Loot](#loot)).
-- The owner gets a notification when their bin is emptied. Owners and keyholders cannot empty their own bin.
-
-If you use a different garbage job, change `WorkerCanCollect` in `server/sv_bins.lua` to check that job instead
-of `ghm-garbagejob`, then call the exports below from your job.
+Nothing, by default. A full bin refuses more bags until something empties it. The resource has no garbage job,
+pay, loot or cooldown built in, so you can decide what a full bin means on your server (a garbage job, a
+pickup request, a fee for a neglected bin, a dumpster-diving mechanic, and so on). See
+[Building on the bin exports](#7-building-on-the-bin-exports).
 
 ---
 
@@ -147,7 +140,7 @@ Choose **Place Bin** (or **Move Bin**). The tablet hides and a ghost bin follows
 flat ground and press `E`. The request is cancelled if the owner takes longer than
 `Bin.Placement.WaitTimeout` (5 minutes). This only shows for the owner, and only when `Bin.OwnerCanPlace = true`.
 
-Removing a bin also clears what is in it, so moving a bin cannot be used to skip the collection cooldown.
+Removing a bin also clears what is in it and its last-emptied time, so a moved bin starts fresh.
 
 ---
 
@@ -188,62 +181,78 @@ All settings are in `shared/settings.lua` under `Cleaning`.
 | `Bin.Placement.RotateStep` | `5.0` | Degrees per scroll tick. |
 | `Bin.Placement.WaitTimeout` | `300000` | Owner placement: ms to walk outside before it cancels. |
 
-### Garbage job
-
-| Setting | Default | Description |
-|---|---|---|
-| `Bin.MinFillToCollect` | `7` | Bags needed before a bin can be emptied. |
-| `Bin.CollectCooldownMinutes` | `60` | Minimum time between two collections of the same bin. |
-| `Bin.CollectDistance` | `4.0` | How close a worker must be to empty a bin. |
-| `Bin.ClaimSeconds` | `600` | How long a crew keeps a bin reserved. |
-| `Bin.BagsPerCredit` | `4` | Bags in a bin per truck bag it counts as. |
-| `Bin.MaxCredit` | `3` | Most truck bags a single bin can count as. |
-
-### Loot
-
-When a bin is emptied the server rolls `Bin.Loot`: one roll, plus one more for every `Bin.RollsPerBags` bags
-that were inside (default 4). Each entry rolls on its own.
-
-```lua
-{ item = 'plastic', min = 1, max = 4, chance = 40 },  -- chance is a percentage
-```
-
-A more expensive property raises every chance by up to `Bin.ValueBonus` (0.5 means +50%), reached at
-`Bin.ValueBonusPrice` (default 1,500,000). Entries for items that do not exist in `ox_inventory` are skipped,
-so the default list is safe to leave alone even if you do not have all of those items.
-
 ---
 
-## 6. Exports and events for developers
+## 6. Exports and events
 
 **Server exports**
 
 | Export | Returns |
 |---|---|
-| `GetPropertyBin(propertyId)` | Bin coordinates `{ x, y, z, h }`, or `nil`. |
-| `GetPropertyBins()` | All bins as `{ propertyId, label, coords }`. Empty when the system is off. |
+| `GetPropertyBins(minFill?)` | Every bin in service as `{ propertyId, label, coords, fill, capacity, emptiedAt }`. Pass `minFill` to only get bins holding at least that many bags. Empty when the system is off. |
+| `GetPropertyBin(propertyId)` | The same table for one property, or `nil` if it has no bin in service. |
+| `SetBinFill(propertyId, fill)` | Sets how many bags are in a bin (clamped to the capacity). Returns `boolean`. |
+| `EmptyBin(propertyId, src?)` | Empties a bin, records the time, tells the owner and fires `binEmptied`. Returns `{ ok, bags? }`. |
 | `GetPropertyJunk(propertyId)` | Number of junk pieces in a house, or `nil` for apartments. |
 | `GetPropertyOccupants(propertyId)` | Player IDs currently inside a property. |
-| `GetCollectableBins(minFill?)` | Bins full enough to empty and not reserved. |
-| `ClaimBin(src, propertyId, owner)` | Reserves a bin for a crew. Returns `boolean`. |
-| `ReleaseBin(propertyId, owner)` | Releases a reservation. |
-| `CollectBin(src, propertyId, owner)` | Empties a bin. Returns `{ ok, reason?, bags?, credit?, loot?, label? }`. |
+
+`emptiedAt` is a Unix time in seconds, or `0` if the bin has never been emptied.
 
 **Client exports**
 
 | Export | Returns |
 |---|---|
-| `GetBinModel()` | The bin prop model name. |
-| `GetNearestBinPropertyId(coords, maxDistance?)` | Property ID of the closest spawned bin. |
-| `IsBinDecoration(entity)` | `true` for the bags piled beside a bin, so a job can ignore them. |
+| `GetBinModel()` | The bin prop model name, for targeting. |
+| `GetNearestBinPropertyId(coords, maxDistance?)` | Property ID of the closest spawned bin, or `nil`. |
 
-**Server event**
+**Server events**
 
-`LNS_Housing:server:binEmptied` is triggered with `(propertyId, src, bags)` after a bin is emptied.
+| Event | Arguments | When |
+|---|---|---|
+| `LNS_Housing:server:binFillChanged` | `propertyId, fill, capacity` | A bin's fill level changed (dumped, trickle, `SetBinFill`, emptied). |
+| `LNS_Housing:server:binEmptied` | `propertyId, src, bags` | `EmptyBin` was called. `src` is whatever you passed, or `nil`. |
 
 ---
 
-## 7. Safety checks
+## 7. Building on the bin exports
+
+The exports above trust the resource that calls them. `EmptyBin` and `SetBinFill` do not check who is asking,
+how close they are or whether they are on a job, so **do those checks in your own resource** before calling them.
+
+A simple pickup job could look like this:
+
+```lua
+-- server side of your own resource
+local function startRoute(src)
+    -- bins that are at least half full
+    local bins = exports.LNS_Housing:GetPropertyBins(6)
+    -- send the player to bins[i].coords ...
+end
+
+RegisterNetEvent('myjob:server:emptyBin', function(propertyId)
+    local src = source
+    if not isOnDuty(src) then return end                       -- your job check
+    local bin = exports.LNS_Housing:GetPropertyBin(propertyId)
+    if not bin or bin.fill < 6 then return end                 -- still worth emptying?
+    if not isNear(src, bin.coords, 4.0) then return end        -- your distance check
+    if os.time() - bin.emptiedAt < 3600 then return end        -- your own cooldown
+
+    local result = exports.LNS_Housing:EmptyBin(propertyId, src)
+    if result.ok then
+        payPlayer(src, result.bags * 25)                       -- your own reward
+    end
+end)
+```
+
+Other ideas that only need these exports: let the owner request a pickup for a tip, charge a fee or spawn pests
+when a bin stays full, or let players pick through a full bin.
+
+On the client, use `GetBinModel()` to add an `ox_target` option to every bin, and
+`GetNearestBinPropertyId(coords)` to find which property the bin you are targeting belongs to.
+
+---
+
+## 8. Safety checks
 
 All of these happen on the server, so a modified client cannot get around them:
 
@@ -254,11 +263,10 @@ All of these happen on the server, so a modified client cannot get around them:
 - Requests are rate limited per player (`Junk.Cooldown`, `Bin.Cooldown`).
 - Bags are checked for the right property tag before they are taken.
 - Bin positions are validated: outside the property, close enough to it, and within sensible world limits.
-- Owners cannot empty their own bin, and each bin can only be collected once per cooldown.
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Problem | Check |
 |---|---|
@@ -269,5 +277,5 @@ All of these happen on the server, so a modified client cannot get around them:
 | "Dump trash bags" doesn't show | The player must carry bags swept up in **that** house. Bags from other houses don't count. |
 | "These trash bags are not from this property." | The bags are from a different house, or untagged bags from before the update. |
 | Junk floats or sits in walls | Pieces sit on a ring around the entry point. Lower `Junk.MaxRadius`, or raise `MinRadius`, for small or oddly shaped interiors. |
-| The bin never gets emptied | Garbage-job hooks are written for `ghm-garbagejob`. See [Emptying the bin](#emptying-the-bin-garbage-job). |
+| The bin never gets emptied | Nothing empties it by default. Use `EmptyBin` from your own job or script (see [Building on the bin exports](#7-building-on-the-bin-exports)). |
 | Changes to settings do nothing | Restart the resource. |

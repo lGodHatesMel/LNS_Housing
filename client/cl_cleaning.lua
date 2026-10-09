@@ -405,19 +405,9 @@ RegisterNetEvent('LNS_Housing:client:binFill', function(propertyId, fill)
     if entry.entity then CreateThread(function() ApplyFillVisuals(entry) end) end
 end)
 
----Client exports for ghm-garbagejob: which property a bin belongs to, and the prop model to target.
+---Client exports: the bin prop model (for targeting) and which property a spawned bin belongs to.
 exports('GetBinModel', function()
     return BinConfig().Model or 'prop_bin_07d'
-end)
-
----True for the bags piled beside a full bin, so the garbage job does not treat them as loose map bags
-exports('IsBinDecoration', function(entity)
-    for _, entry in pairs(Bins) do
-        for _, bag in ipairs(entry.bags) do
-            if bag == entity then return true end
-        end
-    end
-    return false
 end)
 
 ---@return integer? propertyId of the closest spawned bin within maxDistance of the coords
