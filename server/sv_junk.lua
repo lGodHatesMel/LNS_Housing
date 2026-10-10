@@ -155,14 +155,14 @@ lib.callback.register('LNS_Housing:server:junk:finish', function(src, propertyId
     -- The bag remembers which property it came from, so only junk that was really swept here can fill this bin
     local item = Settings.Cleaning.Item or 'trash_bag'
     local metadata = { property = id, description = ('Junk from %s'):format(p.label or ('property ' .. id)) }
-    if not exports.ox_inventory:CanCarryItem(src, item, 1, metadata) then
+    if not Bridge.Server.CanCarryItem(src, item, 1, metadata) then
         Claims[id][piece] = nil
         Bridge.Server.Notify(src, 'You cannot carry another trash bag.', 'error')
         return false
     end
 
     Claims[id][piece] = nil
-    if not exports.ox_inventory:AddItem(src, item, 1, metadata) then return false end
+    if not Bridge.Server.AddItem(src, item, 1, metadata) then return false end
 
     -- Look the piece up again: the list may have changed while the inventory call ran
     local ids = GetJunkIds(p)

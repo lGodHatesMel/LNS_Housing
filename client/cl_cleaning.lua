@@ -304,7 +304,7 @@ end
 ---True when the player carries a trash bag swept up in this property (the server checks again when dumping)
 local function CarriesTrashBag(propertyId)
     local item = Settings.Cleaning.Item or 'trash_bag'
-    for _, slot in pairs(exports.ox_inventory:Search('slots', item) or {}) do
+    for _, slot in pairs(Bridge.Client.Search('slots', item) or {}) do
         if slot.metadata and tonumber(slot.metadata.property) == propertyId then return true end
     end
     return false

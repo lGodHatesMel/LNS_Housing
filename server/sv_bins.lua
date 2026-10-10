@@ -82,7 +82,7 @@ local function GetPropertyBags(src, propertyId)
     local item = Settings.Cleaning.Item or 'trash_bag'
     local slots, matching, total = {}, 0, 0
 
-    for _, slot in pairs(exports.ox_inventory:Search(src, 'slots', item) or {}) do
+    for _, slot in pairs(Bridge.Server.Search(src, 'slots', item) or {}) do
         total = total + slot.count
         if slot.metadata and tonumber(slot.metadata.property) == propertyId then
             matching = matching + slot.count
@@ -120,7 +120,7 @@ lib.callback.register('LNS_Housing:server:bin:dump', function(src, propertyId)
     for _, entry in ipairs(slots) do
         if removed >= wanted then break end
         local take = math.min(entry.count, wanted - removed)
-        if exports.ox_inventory:RemoveItem(src, item, take, nil, entry.slot) then
+        if Bridge.Server.RemoveItem(src, item, take, nil, entry.slot) then
             removed = removed + take
         end
     end

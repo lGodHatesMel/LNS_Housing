@@ -11,7 +11,7 @@ This page explains how it works, how to switch it on or off, and how to set it u
 
 ## 1. Quick start
 
-1. **Add the item.** Add a `trash_bag` item to `ox_inventory` (`ox_inventory/data/items.lua`):
+1. **Add the item.** Add a `trash_bag` item to your inventory (this example is for `ox_inventory`, in `ox_inventory/data/items.lua`):
 
    ```lua
    ['trash_bag'] = {
@@ -39,7 +39,9 @@ This page explains how it works, how to switch it on or off, and how to set it u
 
 No SQL changes are needed. Everything is stored in each property's existing `metadata` column.
 
-**Requirements:** `ox_lib`, `ox_target`, `ox_inventory` and `oxmysql`. The junk props are streamed from
+**Requirements:** `ox_lib`, `ox_target`, `oxmysql` and a supported inventory (`ox_inventory`). Inventory calls go through
+the bridge (`Bridge.Server.AddItem`, `RemoveItem`, `Search`, `CanCarryItem` and `Bridge.Client.Search`), so support for another
+inventory only has to be added there. The junk props are streamed from
 `stream/[Props]/[Junk]` and are loaded by `fxmanifest.lua`, so there is nothing extra to install.
 
 ---

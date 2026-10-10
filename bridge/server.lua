@@ -376,6 +376,14 @@ function Bridge.Server.RemoveItem(source, item, count, metadata, slot)
     return false
 end
 
+function Bridge.Server.CanCarryItem(source, item, count, metadata)
+    debugPrint('info', 'Bridge.Server.CanCarryItem', {source = source, item = item, count = count})
+    if Bridge.Inventory == 'ox_inventory' then
+        return exports.ox_inventory:CanCarryItem(source, item, count, metadata)
+    end
+    return false
+end
+
 function Bridge.Server.GetOfflineKeyCount(propertyId, isApartment, itemName, onlineIdentifiers)
     if not itemName then return 0 end
     onlineIdentifiers = onlineIdentifiers or {}
